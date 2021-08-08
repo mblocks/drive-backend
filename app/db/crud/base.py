@@ -25,7 +25,7 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
 
     def __filter(self, query, search):
         for attr, value in search.items():
-            if value is not None:
+            if value:
                 if type(value) == str and (value.startswith('*') or value.endswith('*')):  # noqa: E501
                     if value.startswith('*'):
                         value = '%{}'.format(value[1:])
@@ -42,8 +42,6 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
                     query = query.filter(getattr(self.model, attr[:-7]).notin_(value))  # noqa: E501
                 elif attr.endswith(' in'):
                     query = query.filter(getattr(self.model, attr[:-3]).in_(value))  # noqa: E501
-                elif attr.endswith(' is NUll'):
-                    query = query.filter(getattr(self.model, attr[:-8]) == None)  # noqa: E501
                 else:
                     query = query.filter(getattr(self.model, attr) == value)
 
@@ -52,9 +50,11 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
     def get(self, db: Session, id: Any) -> Optional[ModelType]:
         return db.query(self.model).filter(self.model.id == id).first()
 
-    def find(self, db: Session, *, search: Dict[str, str] = {}):
+    def find(self, db: Session, *, search: Dict[str, str] = {}, select: List[str] = []):
         query = db.query(self.model)
         query = self.__filter(query, search)
+        if select:
+            query = query.with_entities(*[getattr(self.model, i) for i in select])
         return query.first()
 
     def get_multi(
@@ -62,11 +62,14 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         db: Session,
         *,
         search: Dict[str, str] = {},
+        select: List[str] = [],
         skip: int = 0,
         limit: int = None
     ) -> List[ModelType]:
         query = db.query(self.model)
         query = self.__filter(query, search)
+        if select:
+            query = query.with_entities(*[getattr(self.model, i) for i in select])
         if limit is not None:
             query = query.offset(skip).limit(limit)
         return query.all()

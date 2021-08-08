@@ -22,9 +22,9 @@ class Ship(ShipBase, DBBase):
     pass
 
 class ShipMove(BaseModel):
-    target: int
+    target:  Optional[int] = None
     documents: List[int]
 
 class ShipCopy(ShipMove):
-    target: int
+    target:  Optional[int] = None
     documents: List[int]

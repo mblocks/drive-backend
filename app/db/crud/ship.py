@@ -7,7 +7,7 @@ from .base import CRUDBase
 
 class CRUDShip(CRUDBase[Ship, ShipCreate, ShipUpdate]):
 
-    def get_breadcrumb(self, db: Session, id: int):
+    def get_breadcrumb(self, db: Session, *, id: int):
         return db.query(Ship, Document)\
                  .with_entities(Document.id, Document.name)\
                  .filter(Ship.object_id==Document.id, Ship.parent==id, Ship.data_enabled==1)\

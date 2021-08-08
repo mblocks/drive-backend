@@ -8,9 +8,30 @@ from .base import CRUDBase
 
 class CRUDDocument(CRUDBase[Document, DocumentCreate, DocumentUpdate]):
 
+    def create_dir(self, db: Session, *, dir, current_user):
+        if dir.parent:
+            parent = self.get_dir(db, id=dir.parent, current_user=current_user)
+            if not parent:
+                return None
+        else:
+            parent = self.get_home(db, current_user=current_user)
+
+        db_dir = Document(type='dir', name=dir.name,
+                          parent=parent.id, data_created_by=current_user.id)
+        db.add(db_dir)
+        db.flush()
+        breadcrumb = db.query(Ship).filter(Ship.parent == parent.id).all()
+        for item in breadcrumb:
+            db.add(Ship(category='breadcrumb', parent=db_dir.id, object_id=item.object_id,
+                   order=item.order, data_created_by=db_dir.data_created_by))
+        db.add(Ship(category='breadcrumb', parent=db_dir.id, object_id=db_dir.id,
+               order=len(breadcrumb)+1, data_created_by=db_dir.data_created_by))
+        db.commit()
+        return db_dir
+
     def get_home(self, db: Session, current_user):
-        find_home = db.query(Document).with_entities(Document.id).filter(
-            Document.parent == 1, Document.name == current_user.id).first()
+        find_home = super().find(db, search={
+            'parent': 1, 'name': current_user.id, 'data_enabled': True}, select=['id'])
         if find_home:
             return find_home
         else:
@@ -30,7 +51,7 @@ class CRUDDocument(CRUDBase[Document, DocumentCreate, DocumentUpdate]):
                  .with_entities(Document.id)\
                  .filter(Document.id == id, Document.data_created_by == current_user.id).first()
 
-    def move(self, db: Session, target, documents, current_user):
+    def move(self, db: Session, *, target, documents, current_user):
         query_orders = db.query(Ship.parent, func.max(Ship.order).label('order'))\
                          .filter(Ship.parent.in_(documents+[target]), Document.data_created_by == current_user.id)\
                          .group_by(Ship.parent).all()
@@ -87,7 +108,7 @@ class CRUDDocument(CRUDBase[Document, DocumentCreate, DocumentUpdate]):
                        object_id=document.id, order=len(target.breadcrumb)+1, data_created_by=current_user.id,))
             if len(item.children) > 0:
                 self._loop_copy(db, target=document,
-                            documents=item.children, current_user=current_user)
+                                documents=item.children, current_user=current_user)
 
     def copy(self, db: Session, target, documents, current_user):
         """
@@ -113,7 +134,7 @@ class CRUDDocument(CRUDBase[Document, DocumentCreate, DocumentUpdate]):
             filter(lambda item: item.id in documents, relation_documents.values()))
 
         self._loop_copy(db, target=target_document,
-                    documents=tree_documents, current_user=current_user)
+                        documents=tree_documents, current_user=current_user)
         db.commit()
         return tree_documents
 
@@ -130,12 +151,9 @@ class CRUDDocument(CRUDBase[Document, DocumentCreate, DocumentUpdate]):
         db.commit()
         return documents
 
-    def download(self, db: Session, id, current_user):
-        document = db.query(Document)\
-                     .with_entities(Document.id, Document.name, Document.file)\
-                     .filter(Document.id == id,
-                             Document.data_created_by == current_user.id,
-                             Document.data_enabled == 1).first()
+    def download(self, db: Session, *, id, current_user):
+        document = super().find(db, search={
+            'id': id, 'data_created_by': current_user.id, 'data_enabled': True}, select=['id', 'name', 'file'])
         if not document:
             return None
         return '/minio/download_{}_url'.format(document.id)
@@ -151,16 +169,6 @@ class CRUDDocument(CRUDBase[Document, DocumentCreate, DocumentUpdate]):
                                        Document.data_created_by == current_user.id,
                                        Document.data_enabled == 1)
         return '/minio/download_{}_url'.format(documents)
-
-    def after_create(self, db: Session, *, db_obj, obj_in):
-        if db_obj.type == 'dir':
-            breadcrumb = db.query(Ship).filter(
-                Ship.parent == db_obj.parent).all()
-            for item in breadcrumb:
-                db.add(Ship(category='breadcrumb', parent=db_obj.id,
-                       object_id=item.object_id, order=item.order, data_created_by=db_obj.data_created_by))
-            db.add(Ship(category='breadcrumb', parent=db_obj.id,
-                   object_id=db_obj.id, order=len(breadcrumb)+1, data_created_by=db_obj.data_created_by))
 
 
 document = CRUDDocument(Document)
