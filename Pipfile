@@ -1,0 +1,20 @@
+[[source]]
+name = "pypi"
+url = "https://pypi.org/simple"
+verify_ssl = true
+
+[dev-packages]
+pytest = "*"
+autopep8 = "*"
+pytest-cov = "*"
+
+[packages]
+fastapi = "*"
+uvicorn = "*"
+pydantic = {extras = ["dotenv"],version = "*"}
+sqlalchemy = "*"
+minio = "*"
+requests = "*"
+
+[requires]
+python_version = "3.8"
