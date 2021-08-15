@@ -21,6 +21,7 @@ async def query_dir(db: Session = Depends(deps.get_db),
     """
     search = {
         'type': 'dir',
+        'data_enabled': True,
         'data_created_by': current_user.id,
         'parent': parent
     }
@@ -74,8 +75,11 @@ async def get_breadcrumb(parent: str = None,
     """
     if parent is None:
         return []
-    dir = crud.ship.find(db, search={
-                         'data_enabled': True, 'data_created_by': current_user.id}, select=['id'])
+    dir = crud.document.find(db, search={
+        'id': parent,
+        'data_enabled': True,
+        'data_created_by': current_user.id
+    }, select=['id'])
     if not dir:
         return []
     breadcrumb = crud.ship.get_breadcrumb(db, id=dir.id)

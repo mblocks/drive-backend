@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 from sqlalchemy import func
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, aliased
 from app.db.models import Document, Ship
 from app.schemas import DocumentCreate, DocumentUpdate
 from .base import CRUDBase
@@ -52,12 +52,18 @@ class CRUDDocument(CRUDBase[Document, DocumentCreate, DocumentUpdate]):
                  .filter(Document.id == id, Document.data_created_by == current_user.id).first()
 
     def move(self, db: Session, *, target, documents, current_user):
+        db.query(Document)\
+                    .filter(Document.id.in_(documents))\
+                    .update({'parent': target}, synchronize_session=False)
         query_orders = db.query(Ship.parent, func.max(Ship.order).label('order'))\
-                         .filter(Ship.parent.in_(documents+[target]), Document.data_created_by == current_user.id)\
+                         .filter(Ship.parent.in_(documents+[target]),
+                                 Ship.data_enabled==True,
+                                 Ship.data_created_by == current_user.id)\
                          .group_by(Ship.parent).all()
+        query_target_ship = db.query(Ship).with_entities(Ship.object_id, Ship.order).filter(Ship.parent == target,Ship.data_enabled==True).order_by(Ship.order.asc()).all()
         offset_orders = {}
-        target_ship = [(item.object_id, item.order) for item in db.query(Ship).with_entities(
-            Ship.object_id, Ship.order).filter(Ship.parent == target).order_by(Ship.order.asc()).all()]
+        target_ship = [(item.object_id, item.order) for item in query_target_ship]
+        Ship_alias = aliased(Ship)
         for item in query_orders:
             offset_orders[item.parent] = item.order
         for item in query_orders:
@@ -65,20 +71,22 @@ class CRUDDocument(CRUDBase[Document, DocumentCreate, DocumentUpdate]):
                 #offset_orders[item.parent] = offset_orders[item.parent] - offset_orders[target]
                 item_offset = offset_orders[item.parent] - \
                     offset_orders[target]
-                filter_exists = db.query(Ship).filter(
-                    Ship.object_id == item.parent, Ship.data_enabled == 1, Ship.data_created_by == current_user.id)
+                filter_exists = db.query(Ship_alias).filter(
+                    Ship_alias.parent==Ship.parent,
+                    Ship_alias.object_id == item.parent, Ship_alias.data_enabled == 1, Ship_alias.data_created_by == current_user.id)
 
                 # delete self ship before self
                 db.query(Ship)\
                     .filter(filter_exists.exists(), Ship.data_created_by == current_user.id, Ship.order < offset_orders[item.parent])\
                     .update({'data_enabled': 0}, synchronize_session=False)
                 # insert target ship before self
-                for item_target_object_id, item_target_order in target_ship:
-                    db.add(Ship(category='breadcrumb', parent=item.parent,
-                           object_id=item_target_object_id, order=item_target_order, data_created_by=current_user.id))
+                for item_ship in db.query(Ship).filter(filter_exists.exists(), Ship.parent==Ship.object_id).all():
+                    for item_target_object_id, item_target_order in target_ship:
+                        db.add(Ship(category='breadcrumb', parent=item_ship.parent,
+                            object_id=item_target_object_id, order=item_target_order, data_created_by=current_user.id))
                 # fix self ship
                 db.query(Ship)\
-                    .filter(Ship.parent == item.parent, Ship.data_created_by == current_user.id)\
+                    .filter(Ship.object_id == item.parent, Ship.data_created_by == current_user.id)\
                     .update({'order': (Ship.order - (item_offset) + 1)})
                 # fix ship after self
                 db.query(Ship)\
@@ -147,6 +155,11 @@ class CRUDDocument(CRUDBase[Document, DocumentCreate, DocumentUpdate]):
           .filter(relation_exists.exists(),
                   Document.data_created_by == current_user.id,
                   Document.data_enabled == 1)\
+          .update({'data_enabled': 0}, synchronize_session=False)
+        db.query(Ship)\
+          .filter(relation_exists.exists(),
+                  Ship.data_created_by == current_user.id,
+                  Ship.data_enabled == 1)\
           .update({'data_enabled': 0}, synchronize_session=False)
         db.commit()
         return documents
