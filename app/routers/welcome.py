@@ -10,7 +10,7 @@ from app.db import crud
 router = APIRouter()
 
 
-@router.get("/dirs", response_model=List[schemas.Document])
+@router.get("/dirs", response_model=List[schemas.Dir])
 async def query_dir(db: Session = Depends(deps.get_db),
                     current_user: schemas.CurrentUser = Depends(
                         deps.get_current_user),
@@ -28,15 +28,14 @@ async def query_dir(db: Session = Depends(deps.get_db),
     if not parent:
         home = crud.document.get_home(db, current_user=current_user)
         search['parent'] = home.id
-    return crud.document.get_multi(db, search=search, select=['id', 'name', 'type', 'parent'])
+    return crud.document.get_multi(db, search=search, select=['id', 'name'], select_alias={'parent': 'NULL' if parent is None else str(parent)})
 
 
 @router.post("/dirs", response_model=schemas.Document)
 async def create_dir(payload: schemas.DirCreate,
                      db: Session = Depends(deps.get_db),
                      current_user: schemas.CurrentUser = Depends(deps.get_current_user)):
-    dir = crud.document.create_dir(
-        db=db, dir=payload, current_user=current_user)
+    dir = crud.document.create_dir(db=db, dir=payload, current_user=current_user)  # nopep8
     if not dir:
         raise HTTPException(status_code=404, detail=[
             {
@@ -90,7 +89,9 @@ async def get_breadcrumb(parent: str = None,
 async def query_document(db: Session = Depends(deps.get_db),
                          current_user: schemas.CurrentUser = Depends(
                              deps.get_current_user),
-                         parent: int = None
+                         parent: int = None,
+                         page: int = 1,
+                         per_page: int = 50,
                          ):
     search = {
         'data_created_by': current_user.id,
@@ -100,7 +101,7 @@ async def query_document(db: Session = Depends(deps.get_db),
     if not parent:
         home = crud.document.get_home(db, current_user=current_user)
         search['parent'] = home.id
-    return crud.document.get_multi(db, search=search)
+    return crud.document.get_multi(db, search=search, skip=(page-1)*per_page, limit=per_page)
 
 
 @router.post("/documents/move")
@@ -116,7 +117,7 @@ async def move_document(payload: schemas.ShipMove,
     return crud.document.move(db, target=payload.target, documents=payload.documents, current_user=current_user)
 
 
-@router.post("/documents/copy")
+@router.post("/documents/copy", response_model=List[schemas.Document])
 async def copy_document(payload: schemas.ShipCopy,
                         db: Session = Depends(deps.get_db),
                         current_user: schemas.CurrentUser = Depends(deps.get_current_user)):
@@ -126,7 +127,14 @@ async def copy_document(payload: schemas.ShipCopy,
     if not payload.target:
         home = crud.document.get_home(db, current_user=current_user)
         payload.target = home.id
-    return crud.document.copy(db, payload.target, payload.documents, current_user=current_user)
+    crud.document.copy(db, payload.target, payload.documents, current_user=current_user)  # nopep8
+    search = {
+        'type': 'dir',
+        'data_enabled': True,
+        'data_created_by': current_user.id,
+        'parent': payload.target
+    }
+    return crud.document.get_multi(db, search=search, select=['id', 'name', 'type', 'parent'])
 
 
 @router.post("/documents/delete")

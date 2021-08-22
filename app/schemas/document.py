@@ -30,3 +30,8 @@ class Document(DBBase):
 class DirCreate(BaseModel):
     name: str
     parent: Optional[str] = None
+
+
+class Dir(DBBase):
+    name: str
+    parent: Optional[str] = None

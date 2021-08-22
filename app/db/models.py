@@ -16,7 +16,7 @@ class Document(Base):
 
     data_enabled = Column(Boolean, default=True)
     data_created_at = Column(TIMESTAMP,default=datetime.utcnow)
-    data_updated_at = Column(TIMESTAMP,onupdate=datetime.utcnow)
+    data_updated_at = Column(TIMESTAMP)
     data_deleted_at = Column(TIMESTAMP)
     data_created_by = Column(Integer)
     data_updated_by = Column(Integer)
@@ -39,7 +39,7 @@ class Ship(Base):
 
     data_enabled = Column(Boolean, default=True)
     data_created_at = Column(TIMESTAMP,default=datetime.utcnow)
-    data_updated_at = Column(TIMESTAMP,onupdate=datetime.utcnow)
+    data_updated_at = Column(TIMESTAMP)
     data_deleted_at = Column(TIMESTAMP)
     data_created_by = Column(Integer)
     data_updated_by = Column(Integer)

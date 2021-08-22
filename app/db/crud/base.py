@@ -4,8 +4,8 @@ from typing import Any, Dict, Generic, List, Optional, Type, TypeVar, Union
 from copy import deepcopy
 from fastapi.encoders import jsonable_encoder
 from pydantic import BaseModel
-from sqlalchemy import func
 from sqlalchemy.orm import Session
+from sqlalchemy.sql.expression import literal_column
 from app.db.base_class import Base
 
 ModelType = TypeVar("ModelType", bound=Base)
@@ -54,7 +54,7 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         query = db.query(self.model)
         query = self.__filter(query, search)
         if select:
-            query = query.with_entities(*[getattr(self.model, i) for i in select])
+            query = query.with_entities(*[getattr(self.model, i) for i in select])  # nopep8
         return query.first()
 
     def get_multi(
@@ -63,13 +63,15 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         *,
         search: Dict[str, str] = {},
         select: List[str] = [],
+        select_alias: Dict[str, str] = {},
         skip: int = 0,
         limit: int = None
     ) -> List[ModelType]:
         query = db.query(self.model)
         query = self.__filter(query, search)
-        if select:
-            query = query.with_entities(*[getattr(self.model, i) for i in select])
+        if select or select_alias:
+            query = query.with_entities(*[getattr(self.model, i) for i in select],
+                                        *[literal_column(v).label(k) for k, v in select_alias.items()])
         if limit is not None:
             query = query.offset(skip).limit(limit)
         return query.all()
@@ -145,7 +147,7 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         db_obj: ModelType,
         obj_in: Union[UpdateSchemaType, Dict[str, Any]]
     ) -> ModelType:
-        self.before_update(db, db_obj = db_obj, obj_in= obj_in)
+        self.before_update(db, db_obj=db_obj, obj_in=obj_in)
         obj_data = jsonable_encoder(obj_in)
         if isinstance(obj_in, dict):
             update_data = obj_in
