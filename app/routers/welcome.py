@@ -57,8 +57,7 @@ async def get_presigned(minio_client=Depends(deps.get_minio),
     policy = PostPolicy(
         "hello", datetime.utcnow() + timedelta(days=10),
     )
-    upload_path = '{}/uploads/{}/{}/'.format(
-        current_user.id, datetime.today().strftime('%Y%m%d'), utils.get_uuid())
+    upload_path = '{}/uploads/{}/{}/'.format(current_user.id, datetime.today().strftime('%Y%m%d'), utils.get_uuid())  # nopep8
     policy.add_starts_with_condition('key', upload_path)
     form_data = minio_client.presigned_post_policy(policy)
     form_data['key'] = upload_path
@@ -124,17 +123,24 @@ async def copy_document(payload: schemas.ShipCopy,
     """
     Find target's breadcrumb and documents's breadcrumb,compare document's max order with target's max order and count offset
     """
-    if not payload.target:
-        home = crud.document.get_home(db, current_user=current_user)
-        payload.target = home.id
-    crud.document.copy(db, payload.target, payload.documents, current_user=current_user)  # nopep8
+    target = crud.document.get_dir(db, id=payload.target, current_user=current_user) if payload.target else crud.document.get_home(
+        db, current_user=current_user)
+    if not target:
+        raise HTTPException(status_code=404, detail=[
+            {
+                "loc": ["body", "target"],
+                "msg": "target not exists",
+                "type": "value_error"
+            },
+        ])
+    crud.document.copy(db, target=target.id, documents=payload.documents, current_user=current_user)  # nopep8
     search = {
         'type': 'dir',
         'data_enabled': True,
         'data_created_by': current_user.id,
-        'parent': payload.target
+        'parent': target.id
     }
-    return crud.document.get_multi(db, search=search, select=['id', 'name', 'type', 'parent'])
+    return crud.document.get_multi(db, search=search, select=['id', 'name', 'type'], select_alias={'parent': 'NULL' if payload.target is None else str(payload.target)})
 
 
 @router.post("/documents/delete")
