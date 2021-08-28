@@ -71,7 +71,7 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         self,
         db: Session,
         *,
-        filter: Dict[str, str],
+        filter: Dict[str, str]={},
         select: List[str] = [],
         select_alias: Dict[str, str] = {},
         skip: int = 0,
@@ -97,8 +97,9 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
                db: Session,
                payload: Union[List[CreateSchemaType], CreateSchemaType],
                *,
-               refresh: bool = False
-               ) -> List[ModelType]:
+               refresh: bool = False,
+               commit: bool = False,
+               ) -> Union[List[ModelType], ModelType]:
         data_id = []
         out_data = []
         create_data = payload if isinstance(payload, list) else [payload]
@@ -108,9 +109,10 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
             db.flush()
             data_id.append(db_item.id)
             out_data.append(jsonable_encoder(db_item))
-        db.commit()
+        if commit:
+            db.commit()
         if refresh:
-            return self.query(db, search={'id in': data_id}) if isinstance(payload, list) else self.get(db, search={'id in': data_id})
+            return self.query(db, search={'id in': data_id}) if isinstance(payload, list) else self.get(db, filter={'id in': data_id})
         else:
             return out_data
 
@@ -120,7 +122,8 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         *,
         filter: Dict[str, str],
         payload: Union[UpdateSchemaType, Dict[str, Any]],
-        refresh: bool = False
+        refresh: bool = False,
+        commit: bool = False
     ) -> Union[List[ModelType], int]:
         update_data = payload if isinstance(
             payload, dict) else payload.dict(exclude_unset=True)
@@ -128,11 +131,13 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         affected_rows = query.update({getattr(self.model, k): v for k, v in update_data.items()},  # nopep8
                                      synchronize_session=False
                                     )
-        db.commit()
+        if commit:
+            db.commit()
         if refresh:
             return self.get(db, search=filter) if 'id' in filter else self.query(db, search=filter)
         else:
             return affected_rows
 
-    def remove(self, db: Session, filter: Dict[str, str]) -> ModelType:
-        return self.update(db, filter=filter, payload={'data_enabled': False})
+    def remove(self, db: Session, filter: Dict[str, str], commit: bool = False) -> ModelType:
+        affected_rows = self.update(db, filter=filter, payload={'data_enabled': False}, commit=commit)
+        return affected_rows
