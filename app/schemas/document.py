@@ -1,5 +1,5 @@
 from typing import Optional, List
-from pydantic import BaseModel
+from pydantic import BaseModel, conint
 from .base import DBBase
 
 
@@ -17,7 +17,7 @@ class DocumentCreate(BaseModel):
 
 
 class DocumentUpdate(BaseModel):
-    id: int
+    id: conint(gt=0)
     name: Optional[str] = None
 
 
