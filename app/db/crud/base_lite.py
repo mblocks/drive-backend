@@ -97,8 +97,8 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
                db: Session,
                payload: Union[List[CreateSchemaType], CreateSchemaType],
                *,
-               refresh: bool = False,
-               commit: bool = False,
+               refresh: bool = True,
+               commit: bool = True,
                ) -> Union[List[ModelType], ModelType]:
         data_id = []
         out_data = []
@@ -122,8 +122,8 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         *,
         filter: Dict[str, str],
         payload: Union[UpdateSchemaType, Dict[str, Any]],
-        refresh: bool = False,
-        commit: bool = False
+        refresh: bool = True,
+        commit: bool = True
     ) -> Union[List[ModelType], int]:
         update_data = payload if isinstance(
             payload, dict) else payload.dict(exclude_unset=True)
@@ -134,10 +134,10 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         if commit:
             db.commit()
         if refresh:
-            return self.get(db, search=filter) if 'id' in filter else self.query(db, search=filter)
+            return self.get(db, filter=filter) if 'id' in filter else self.query(db, filter=filter)
         else:
             return affected_rows
 
-    def remove(self, db: Session, filter: Dict[str, str], commit: bool = False) -> ModelType:
+    def remove(self, db: Session, filter: Dict[str, str], commit: bool = True) -> ModelType:
         affected_rows = self.update(db, filter=filter, payload={'data_enabled': False}, commit=commit)
         return affected_rows
