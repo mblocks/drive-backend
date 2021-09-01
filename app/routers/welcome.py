@@ -19,16 +19,15 @@ async def query_dir(db: Session = Depends(deps.get_db),
     Find current_user's home dir.\n
     Filter parent by home if parent is none.
     """
-    search = {
+    filter = {
         'type': 'dir',
-        'data_enabled': True,
         'data_created_by': current_user.id,
         'parent': parent
     }
     if not parent:
         home = crud.document.get_home(db, current_user=current_user)
-        search['parent'] = home.id
-    return crud.document.get_multi(db, search=search, select=['id', 'name'], select_alias={'parent': 'NULL' if parent is None else str(parent)})
+        filter['parent'] = home.id
+    return crud.document.query(db, filter=filter, select=['id', 'name'], select_alias={'parent': 'NULL' if parent is None else str(parent)})
 
 
 @router.post("/dirs", response_model=schemas.Document)
@@ -73,9 +72,8 @@ async def get_breadcrumb(parent: str = None,
     """
     if parent is None:
         return []
-    dir = crud.document.find(db, search={
+    dir = crud.document.get(db, filter={
         'id': parent,
-        'data_enabled': True,
         'data_created_by': current_user.id
     }, select=['id'])
     if not dir:
@@ -100,7 +98,7 @@ async def query_document(db: Session = Depends(deps.get_db),
     if not parent:
         home = crud.document.get_home(db, current_user=current_user)
         search['parent'] = home.id
-    return crud.document.get_multi(db, search=search, skip=(page-1)*per_page, limit=per_page)
+    return crud.document.query(db, filter=search, skip=(page-1)*per_page, limit=per_page)
 
 
 @router.post("/documents/move")
@@ -134,13 +132,12 @@ async def copy_document(payload: schemas.ShipCopy,
             },
         ])
     crud.document.copy(db, target=target.id, documents=payload.documents, current_user=current_user)  # nopep8
-    search = {
+    filter = {
         'type': 'dir',
-        'data_enabled': True,
         'data_created_by': current_user.id,
         'parent': target.id
     }
-    return crud.document.get_multi(db, search=search, select=['id', 'name', 'type'], select_alias={'parent': 'NULL' if payload.target is None else str(payload.target)})
+    return crud.document.query(db, filter=filter, select=['id', 'name', 'type'], select_alias={'parent': 'NULL' if payload.target is None else str(payload.target)})
 
 
 @router.post("/documents/delete")
@@ -160,9 +157,8 @@ async def update_document(payload: schemas.DocumentUpdate,
     """
     Find target's breadcrumb and documents's breadcrumb,compare document's max order with target's max order and count offset
     """
-    document = crud.document.find(db, search={
-                                  'id': payload.id, 'data_created_by': current_user.id, 'data_enabled': 1})
-    if not document:
+    filter = { 'id': payload.id, 'data_created_by': current_user.id }
+    if crud.document.count(db, filter=filter) == 0:
         raise HTTPException(status_code=404, detail=[
             {
                 "loc": ["body", "id"],
@@ -170,7 +166,7 @@ async def update_document(payload: schemas.DocumentUpdate,
                 "type": "value_error"
             },
         ])
-    return crud.document.update(db, db_obj=document, obj_in=payload)
+    return crud.document.update(db, filter=filter, payload=payload)
 
 
 @router.get("/documents/download")

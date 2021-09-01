@@ -3,7 +3,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session, aliased
 from app.db.models import Document, Ship
 from app.schemas import DocumentCreate, DocumentUpdate
-from .base import CRUDBase
+from .base_lite import CRUDBase
 
 
 class CRUDDocument(CRUDBase[Document, DocumentCreate, DocumentUpdate]):
@@ -30,8 +30,10 @@ class CRUDDocument(CRUDBase[Document, DocumentCreate, DocumentUpdate]):
         return db_dir
 
     def get_home(self, db: Session, current_user):
-        find_home = super().find(db, search={
-            'parent': 1, 'name': current_user.id, 'data_enabled': True}, select=['id'])
+        find_home = super().get(db,
+                                filter={'parent': 1, 'name': current_user.id},
+                                select=['id']
+                                )
         if find_home:
             return find_home
         else:
@@ -44,25 +46,31 @@ class CRUDDocument(CRUDBase[Document, DocumentCreate, DocumentUpdate]):
             db.add(Ship(category='breadcrumb', parent=home.id,
                    object_id=home.id, order=2, data_created_by=current_user.id))
             db.commit()
-            return db.query(Document).with_entities(Document.id).filter(Document.parent == 1, Document.name == current_user.id).first()
+            return super().get(db,
+                               filter={'parent': 1, 'name': current_user.id},
+                               select=['id']
+                               )
 
     def get_dir(self, db: Session, id, current_user):
-        return db.query(Document)\
-                 .with_entities(Document.id)\
-                 .filter(Document.id == id, Document.data_created_by == current_user.id).first()
+        return super().get(db,
+                           filter={'id': id, 'data_created_by': current_user.id},
+                           select=['id']
+                           )
 
     def move(self, db: Session, *, target, documents, current_user):
         db.query(Document)\
-                    .filter(Document.id.in_(documents))\
-                    .update({'parent': target}, synchronize_session=False)
+            .filter(Document.id.in_(documents))\
+            .update({'parent': target}, synchronize_session=False)
         query_orders = db.query(Ship.parent, func.max(Ship.order).label('order'))\
                          .filter(Ship.parent.in_(documents+[target]),
-                                 Ship.data_enabled==True,
+                                 Ship.data_enabled == True,
                                  Ship.data_created_by == current_user.id)\
                          .group_by(Ship.parent).all()
-        query_target_ship = db.query(Ship).with_entities(Ship.object_id, Ship.order).filter(Ship.parent == target,Ship.data_enabled==True).order_by(Ship.order.asc()).all()
+        query_target_ship = db.query(Ship).with_entities(Ship.object_id, Ship.order).filter(
+            Ship.parent == target, Ship.data_enabled == True).order_by(Ship.order.asc()).all()
         offset_orders = {}
-        target_ship = [(item.object_id, item.order) for item in query_target_ship]
+        target_ship = [(item.object_id, item.order)
+                       for item in query_target_ship]
         Ship_alias = aliased(Ship)
         for item in query_orders:
             offset_orders[item.parent] = item.order
@@ -72,18 +80,18 @@ class CRUDDocument(CRUDBase[Document, DocumentCreate, DocumentUpdate]):
                 item_offset = offset_orders[item.parent] - \
                     offset_orders[target]
                 filter_exists = db.query(Ship_alias).filter(
-                    Ship_alias.parent==Ship.parent,
-                    Ship_alias.object_id == item.parent, Ship_alias.data_enabled == 1, Ship_alias.data_created_by == current_user.id)
+                    Ship_alias.parent == Ship.parent,
+                    Ship_alias.object_id == item.parent, Ship_alias.data_enabled == True, Ship_alias.data_created_by == current_user.id)
 
                 # delete self ship before self
                 db.query(Ship)\
                     .filter(filter_exists.exists(), Ship.data_created_by == current_user.id, Ship.order < offset_orders[item.parent])\
-                    .update({'data_enabled': 0}, synchronize_session=False)
+                    .update({'data_enabled': False}, synchronize_session=False)
                 # insert target ship before self
-                for item_ship in db.query(Ship).filter(filter_exists.exists(), Ship.parent==Ship.object_id).all():
+                for item_ship in db.query(Ship).filter(filter_exists.exists(), Ship.parent == Ship.object_id).all():
                     for item_target_object_id, item_target_order in target_ship:
                         db.add(Ship(category='breadcrumb', parent=item_ship.parent,
-                            object_id=item_target_object_id, order=item_target_order, data_created_by=current_user.id))
+                                    object_id=item_target_object_id, order=item_target_order, data_created_by=current_user.id))
                 # fix self ship
                 db.query(Ship)\
                     .filter(Ship.object_id == item.parent, Ship.data_created_by == current_user.id)\
@@ -122,14 +130,14 @@ class CRUDDocument(CRUDBase[Document, DocumentCreate, DocumentUpdate]):
         """
         find relationship documents with selected documents generate a dict with document's parent as key
         """
-        target_document = self.get(db, id=target)
+        target_document = self.get(db, filter={'id': target})
         if not target_document:
             # target not exists
             return []
         relation_exists = db.query(Ship).filter(Ship.object_id.in_(
-            documents), Ship.parent == Document.id, Ship.data_enabled == 1, Ship.data_created_by == current_user.id)
+            documents), Ship.parent == Document.id, Ship.data_enabled == True, Ship.data_created_by == current_user.id)
         relation_documents = {}
-        for item in db.query(Document).filter(relation_exists.exists(), Document.data_enabled == 1).all():
+        for item in db.query(Document).filter(relation_exists.exists(), Document.data_enabled == True).all():
             item.children = []
             relation_documents[item.id] = item
 
@@ -150,23 +158,23 @@ class CRUDDocument(CRUDBase[Document, DocumentCreate, DocumentUpdate]):
         relation_exists = db.query(Ship)\
                             .filter(Ship.object_id.in_(documents),
                                     Ship.parent == Document.id,
-                                    Ship.data_enabled == 1)
+                                    Ship.data_enabled == True)
         db.query(Document)\
           .filter(relation_exists.exists(),
                   Document.data_created_by == current_user.id,
-                  Document.data_enabled == 1)\
-          .update({'data_enabled': 0}, synchronize_session=False)
+                  Document.data_enabled == True)\
+          .update({'data_enabled': False}, synchronize_session=False)
         db.query(Ship)\
           .filter(relation_exists.exists(),
                   Ship.data_created_by == current_user.id,
-                  Ship.data_enabled == 1)\
-          .update({'data_enabled': 0}, synchronize_session=False)
+                  Ship.data_enabled == True)\
+          .update({'data_enabled': False}, synchronize_session=False)
         db.commit()
         return documents
 
     def download(self, db: Session, *, id, current_user):
-        document = super().find(db, search={
-            'id': id, 'data_created_by': current_user.id, 'data_enabled': True}, select=['id', 'name', 'file'])
+        document = super().get(db, filter={
+            'id': id, 'data_created_by': current_user.id}, select=['id', 'name', 'file'])
         if not document:
             return None
         return '/minio/download_{}_url'.format(document.id)
@@ -175,12 +183,12 @@ class CRUDDocument(CRUDBase[Document, DocumentCreate, DocumentUpdate]):
         relation_exists = db.query(Ship)\
                             .filter(Ship.object_id.in_(documents),
                                     Ship.parent == Document.id,
-                                    Ship.data_enabled == 1)
+                                    Ship.data_enabled == True)
         download_documents = db.query(Document)\
                                .with_entities(Document.id, Document.name, Document.file)\
                                .filter(relation_exists.exists(),
                                        Document.data_created_by == current_user.id,
-                                       Document.data_enabled == 1)
+                                       Document.data_enabled == True)
         return '/minio/download_{}_url'.format(documents)
 
 
