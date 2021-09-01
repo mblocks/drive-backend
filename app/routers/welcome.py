@@ -82,7 +82,7 @@ async def get_breadcrumb(parent: str = None,
     return breadcrumb[2:]
 
 
-@router.get("/documents")
+@router.get("/documents", response_model=List[schemas.Document])
 async def query_document(db: Session = Depends(deps.get_db),
                          current_user: schemas.CurrentUser = Depends(
                              deps.get_current_user),
@@ -98,7 +98,7 @@ async def query_document(db: Session = Depends(deps.get_db),
     if not parent:
         home = crud.document.get_home(db, current_user=current_user)
         search['parent'] = home.id
-    return crud.document.query(db, filter=search, skip=(page-1)*per_page, limit=per_page)
+    return crud.document.query(db, filter=search, select=['id','name','type','parent'], skip=(page-1)*per_page, limit=per_page)
 
 
 @router.post("/documents/move")
@@ -150,7 +150,7 @@ async def delete_document(payload: List[int],
     return crud.document.delete(db, documents=payload, current_user=current_user)
 
 
-@router.post("/documents/update")
+@router.post("/documents/update", response_model=schemas.Document)
 async def update_document(payload: schemas.DocumentUpdate,
                           db: Session = Depends(deps.get_db),
                           current_user: schemas.CurrentUser = Depends(deps.get_current_user)):
