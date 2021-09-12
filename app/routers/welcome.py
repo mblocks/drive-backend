@@ -1,10 +1,11 @@
 # -*- coding: utf-8 -*-
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 from minio.datatypes import PostPolicy
 from datetime import datetime, timedelta
-from app import deps, schemas, utils
+from app import deps, schemas
 from app.db import crud
 
 router = APIRouter()
@@ -49,14 +50,18 @@ async def create_dir(payload: schemas.DirCreate,
 @router.get("/presigned")
 async def get_presigned(minio_client=Depends(deps.get_minio),
                         db: Session = Depends(deps.get_db),
-                        current_user: schemas.CurrentUser = Depends(deps.get_current_user)):
+                        current_user: schemas.CurrentUser = Depends(deps.get_current_user),  # nopep8
+                        settings = Depends(deps.get_settings),
+                        parent: int = None):
     """
-    Generate minio presigned url
+    Generate minio presigned url as formatted string: /home/{user_id}/{dir_id}/{timestamp}/
+    After each file is uploaded, the saved path will no longer change.
+    Copying, moving will use the same file path.
+    The delete operation only deletes the data record in the table document, not the actual file.
     """
-    policy = PostPolicy(
-        "hello", datetime.utcnow() + timedelta(days=10),
-    )
-    upload_path = '{}/uploads/{}/{}/'.format(current_user.id, datetime.today().strftime('%Y%m%d'), utils.get_uuid())  # nopep8
+    dir = crud.document.get_dir(db, id=parent, current_user=current_user)
+    policy = PostPolicy(settings.SERVICES_MINIO_BUCKET, datetime.utcnow() + timedelta(days=1))  # nopep8
+    upload_path = '/home/{}/{}/{}/'.format(current_user.id, dir.id, int(datetime.now().timestamp()))  # nopep8
     policy.add_starts_with_condition('key', upload_path)
     form_data = minio_client.presigned_post_policy(policy)
     form_data['key'] = upload_path
@@ -98,7 +103,7 @@ async def query_document(db: Session = Depends(deps.get_db),
     if not parent:
         home = crud.document.get_home(db, current_user=current_user)
         search['parent'] = home.id
-    return crud.document.query(db, filter=search, select=['id','name','type','parent'], skip=(page-1)*per_page, limit=per_page)
+    return crud.document.query(db, filter=search, select=['id', 'name', 'type', 'parent'], skip=(page-1)*per_page, limit=per_page)
 
 
 @router.post("/documents/move")
@@ -157,7 +162,7 @@ async def update_document(payload: schemas.DocumentUpdate,
     """
     Find target's breadcrumb and documents's breadcrumb,compare document's max order with target's max order and count offset
     """
-    filter = { 'id': payload.id, 'data_created_by': current_user.id }
+    filter = {'id': payload.id, 'data_created_by': current_user.id}
     if crud.document.count(db, filter=filter) == 0:
         raise HTTPException(status_code=404, detail=[
             {
@@ -172,11 +177,15 @@ async def update_document(payload: schemas.DocumentUpdate,
 @router.get("/documents/download")
 async def get_breadcrumb(id: str = Query(...),
                          db: Session = Depends(deps.get_db),
+                         minio_client=Depends(deps.get_minio),
                          current_user: schemas.CurrentUser = Depends(deps.get_current_user)):
     """
     Generate minio download url,keep directory structure
     """
-    document = crud.document.download(db, id=id, current_user=current_user)
+    document = crud.document.get(db,
+                                 filter={'id': id, 'data_created_by': current_user.id},  # nopep8
+                                 select=['id', 'name', 'file']
+                                 )
     if not document:
         raise HTTPException(status_code=404, detail=[
             {
@@ -185,4 +194,12 @@ async def get_breadcrumb(id: str = Query(...),
                 "type": "value_error"
             },
         ])
-    return document
+    download_url = minio_client.get_presigned_url(
+        'GET',
+        'drive',
+        document.file,
+        expires=timedelta(hours=1),
+        response_headers={
+            'Content-Disposition': 'attachment;filename="{}"'.format(document.name)}
+    )
+    return RedirectResponse(download_url)

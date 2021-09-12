@@ -12,3 +12,4 @@ app.add_middleware(
     allow_headers=["*"],
 )
 app.include_router(routers.welcome, tags=["welcome"])
+app.include_router(routers.webhooks, tags=["webhooks"], prefix="/webhooks")

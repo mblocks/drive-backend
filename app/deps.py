@@ -35,3 +35,6 @@ def get_minio():
                  secure=False,
                  region='mblocks'
                  )
+
+def get_settings():
+    return settings

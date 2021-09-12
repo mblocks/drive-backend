@@ -52,10 +52,14 @@ class CRUDDocument(CRUDBase[Document, DocumentCreate, DocumentUpdate]):
                                )
 
     def get_dir(self, db: Session, id, current_user):
-        return super().get(db,
+        if id:
+            dir = super().get(db,
                            filter={'id': id, 'data_created_by': current_user.id},
                            select=['id']
                            )
+            if dir:
+                return dir
+        return self.get_home(db, current_user)
 
     def move(self, db: Session, *, target, documents, current_user):
         db.query(Document)\

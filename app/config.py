@@ -24,6 +24,7 @@ class Settings(BaseSettings):
     SERVICES_MINIO_HOST = 'minio.local.com'
     SERVICES_MINIO_ACCESS_KEY = 'hello'
     SERVICES_MINIO_SECRET_KEY = 'helloworld'
+    SERVICES_MINIO_BUCKET = 'drive'
     
     class Config:
         case_sensitive: bool = True
