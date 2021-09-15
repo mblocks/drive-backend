@@ -51,7 +51,7 @@ async def create_dir(payload: schemas.DirCreate,
 async def get_presigned(minio_client=Depends(deps.get_minio),
                         db: Session = Depends(deps.get_db),
                         current_user: schemas.CurrentUser = Depends(deps.get_current_user),  # nopep8
-                        settings = Depends(deps.get_settings),
+                        settings=Depends(deps.get_settings),
                         parent: int = None):
     """
     Generate minio presigned url as formatted string: /home/{user_id}/{dir_id}/{timestamp}/
@@ -89,8 +89,8 @@ async def get_breadcrumb(parent: str = None,
 
 @router.get("/documents", response_model=List[schemas.Document])
 async def query_document(db: Session = Depends(deps.get_db),
-                         current_user: schemas.CurrentUser = Depends(
-                             deps.get_current_user),
+                         current_user: schemas.CurrentUser = Depends(deps.get_current_user),  # nopep8
+                         minio_client=Depends(deps.get_minio),
                          parent: int = None,
                          page: int = 1,
                          per_page: int = 50,
@@ -103,7 +103,16 @@ async def query_document(db: Session = Depends(deps.get_db),
     if not parent:
         home = crud.document.get_home(db, current_user=current_user)
         search['parent'] = home.id
-    return crud.document.query(db, filter=search, select=['id', 'name', 'type', 'parent'], skip=(page-1)*per_page, limit=per_page)
+    documents = []
+    for item in crud.document.query(db, filter=search, select=['id', 'name', 'type', 'parent', 'file'], skip=(page-1)*per_page, limit=per_page):
+        documents.append({
+            'id': item.id,
+            'name': item.name,
+            'type': item.type,
+            'parent': item.parent,
+            'thumbnail': minio_client.presigned_get_object("drive", item.file)
+        })
+    return documents
 
 
 @router.post("/documents/move")

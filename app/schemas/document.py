@@ -1,4 +1,4 @@
-from typing import Optional, List
+from typing import Optional
 from pydantic import BaseModel, conint
 from .base import DBBase
 
@@ -25,6 +25,7 @@ class Document(DBBase):
     name: str
     type: str
     parent: Optional[str] = None
+    thumbnail: Optional[str] = None
 
 
 class DirCreate(BaseModel):
