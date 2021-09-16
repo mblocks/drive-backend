@@ -173,6 +173,11 @@ class CRUDDocument(CRUDBase[Document, DocumentCreate, DocumentUpdate]):
                   Ship.data_created_by == current_user.id,
                   Ship.data_enabled == True)\
           .update({'data_enabled': False}, synchronize_session=False)
+        db.query(Document)\
+          .filter(Document.id.in_(documents),
+                  Document.data_created_by == current_user.id,
+                  Document.data_enabled == True)\
+          .update({'data_enabled': False}, synchronize_session=False)
         db.commit()
         return documents
 
