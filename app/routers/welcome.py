@@ -104,13 +104,13 @@ async def query_document(db: Session = Depends(deps.get_db),
         home = crud.document.get_home(db, current_user=current_user)
         search['parent'] = home.id
     documents = []
-    for item in crud.document.query(db, filter=search, select=['id', 'name', 'type', 'parent', 'file'], skip=(page-1)*per_page, limit=per_page):
+    for item in crud.document.query(db, filter=search, select=['id', 'name', 'type', 'parent', 'file','content_type','thumbnail'], skip=(page-1)*per_page, limit=per_page):
         documents.append({
             'id': item.id,
             'name': item.name,
             'type': item.type,
             'parent': item.parent,
-            'thumbnail': minio_client.presigned_get_object("drive", item.file)
+            'thumbnail': minio_client.presigned_get_object("drive", item.thumbnail,response_headers={"response-content-type": item.content_type}) if item.thumbnail else None
         })
     return documents
 

@@ -15,6 +15,7 @@ class Document(Base):
     size = Column(Integer)
     content_type = Column(String(200))
     etag = Column(String(100))
+    thumbnail = Column(String(100))
 
     data_enabled = Column(Boolean, default=True)
     data_created_at = Column(TIMESTAMP,default=datetime.utcnow)
