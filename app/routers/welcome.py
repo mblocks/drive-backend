@@ -110,6 +110,7 @@ async def query_document(db: Session = Depends(deps.get_db),
             'name': item.name,
             'type': item.type,
             'parent': item.parent,
+            'preview': minio_client.presigned_get_object("drive", item.file,response_headers={"response-content-type": item.content_type}) if item.thumbnail else None,
             'thumbnail': minio_client.presigned_get_object("drive", item.thumbnail,response_headers={"response-content-type": item.content_type}) if item.thumbnail else None
         })
     return documents

@@ -26,6 +26,7 @@ class Document(DBBase):
     type: str
     parent: Optional[str] = None
     thumbnail: Optional[str] = None
+    preview: Optional[str] = None
 
 
 class DirCreate(BaseModel):
