@@ -209,6 +209,6 @@ async def get_breadcrumb(id: str = Query(...),
         document.file,
         expires=timedelta(hours=1),
         response_headers={
-            'Content-Disposition': 'attachment;filename="{}"'.format(document.name)}
+            'response-content-disposition': 'attachment;filename="{}"'.format(document.name)}
     )
     return RedirectResponse(download_url)
