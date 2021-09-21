@@ -93,7 +93,7 @@ async def query_document(db: Session = Depends(deps.get_db),
                          minio_client=Depends(deps.get_minio),
                          parent: int = None,
                          page: int = 1,
-                         per_page: int = 50,
+                         per_page: int = 100,
                          ):
     search = {
         'data_created_by': current_user.id,
@@ -104,7 +104,7 @@ async def query_document(db: Session = Depends(deps.get_db),
         home = crud.document.get_home(db, current_user=current_user)
         search['parent'] = home.id
     documents = []
-    for item in crud.document.query(db, filter=search, select=['id', 'name', 'type', 'parent', 'file','content_type','thumbnail'], skip=(page-1)*per_page, limit=per_page):
+    for item in crud.document.query(db, filter=search, select=['id', 'name', 'type', 'parent', 'file','content_type','thumbnail'], skip=(page-1)*per_page, limit=per_page, order_by='file asc,id asc'):
         documents.append({
             'id': item.id,
             'name': item.name,

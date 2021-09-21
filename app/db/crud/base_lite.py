@@ -3,7 +3,7 @@ from typing import Any, Dict, Generic, List, Optional, Type, TypeVar, Union
 from fastapi.encoders import jsonable_encoder
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
-from sqlalchemy.sql.expression import literal_column
+from sqlalchemy.sql import expression
 from app.db.base_class import Base
 
 ModelType = TypeVar("ModelType", bound=Base)
@@ -54,7 +54,7 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         query = self.__filter(query, filter)
         if select or select_alias:
             query = query.with_entities(*[getattr(self.model, i) for i in select],
-                                        *[literal_column(v).label(k) for k, v in select_alias.items()])
+                                        *[expression.literal_column(v).label(k) for k, v in select_alias.items()])
         return query
 
     def get(self,
@@ -75,10 +75,13 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         select: List[str] = [],
         select_alias: Dict[str, str] = {},
         skip: int = 0,
-        limit: int = None
+        limit: int = None,
+        order_by: str = None,
     ) -> List[ModelType]:
         query = self._query_data(
             db, filter=filter, select=select, select_alias=select_alias)
+        if order_by:
+            query = query.order_by(expression.text(order_by))
         if limit is not None:
             query = query.offset(skip).limit(limit)
         return query.all()
