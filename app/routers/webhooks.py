@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from PIL import Image
+from PIL import Image, ExifTags
 from io import BytesIO
 from fastapi import APIRouter, Request, Depends
 from sqlalchemy.orm import Session
@@ -18,9 +18,23 @@ def generate_thumbnail(key, *, content_type):
     file = minio_client.get_object("drive", key)
     thumbnail = 'thumbnail/{}'.format(key)
     with Image.open(file) as im:
+        # https://stackoverflow.com/questions/4228530/pil-thumbnail-is-rotating-my-image
         im.thumbnail((400, 400))
         file_stream = BytesIO()
-        im.save(file_stream, format=im.format)
+        exif=dict((ExifTags.TAGS[k], v) for k, v in im.getexif().items() if k in ExifTags.TAGS)
+        orientation = exif.get('Orientation')
+        if orientation:
+            if orientation == 3:
+                rotated = im.rotate(180, expand=True)
+            elif orientation == 6:
+                rotated = im.rotate(-90, expand=True)
+            elif orientation == 8:
+                rotated = im.rotate(90, expand=True)
+            else:
+                rotated = im
+            rotated.save(file_stream, format=im.format)
+        else:
+            im.save(file_stream, format=im.format)
         file_stream.seek(0)
         # print(im.format,im.info,im.size,file_stream.tell(),file_stream.getvalue())
         minio_client.put_object(
