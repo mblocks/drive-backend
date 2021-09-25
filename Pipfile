@@ -15,6 +15,7 @@ pydantic = {extras = ["dotenv"],version = "*"}
 sqlalchemy = "*"
 minio = "*"
 requests = "*"
+pillow = "*"
 
 [requires]
 python_version = "3.8"
