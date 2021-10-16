@@ -5,7 +5,7 @@ from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 from minio.datatypes import PostPolicy
 from datetime import datetime, timedelta
-from app import deps, schemas
+from app import deps, schemas, utils
 from app.db import crud
 
 router = APIRouter()
@@ -90,7 +90,6 @@ async def get_breadcrumb(parent: str = None,
 @router.get("/documents", response_model=List[schemas.Document])
 async def query_document(db: Session = Depends(deps.get_db),
                          current_user: schemas.CurrentUser = Depends(deps.get_current_user),  # nopep8
-                         minio_client=Depends(deps.get_minio),
                          parent: int = None,
                          page: int = 1,
                          per_page: int = 100,
@@ -110,8 +109,8 @@ async def query_document(db: Session = Depends(deps.get_db),
             'name': item.name,
             'type': item.type,
             'parent': item.parent,
-            'preview': minio_client.presigned_get_object("drive", item.file,response_headers={"response-content-type": item.content_type}) if item.thumbnail else None,
-            'thumbnail': minio_client.presigned_get_object("drive", item.thumbnail,response_headers={"response-content-type": item.content_type}) if item.thumbnail else None
+            'preview': utils.get_minio_presigned_url(item.file, item.content_type) if item.thumbnail else None,
+            'thumbnail': utils.get_minio_presigned_url(item.thumbnail, item.content_type) if item.thumbnail else None
         })
     return documents
 

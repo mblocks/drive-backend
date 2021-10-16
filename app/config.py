@@ -25,6 +25,7 @@ class Settings(BaseSettings):
     SERVICES_MINIO_ACCESS_KEY = 'hello'
     SERVICES_MINIO_SECRET_KEY = 'helloworld'
     SERVICES_MINIO_BUCKET = 'drive'
+    SERVICES_MINIO_PROXY = None
     
     class Config:
         case_sensitive: bool = True
