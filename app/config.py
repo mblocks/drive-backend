@@ -21,11 +21,11 @@ class Settings(BaseSettings):
     SQLALCHEMY_DATABASE_URI: str = prefix + os.path.join(basedir, 'data.db')
     SQLALCHEMY_ECHO: bool = False
 
-    SERVICES_MINIO_HOST = 'minio.local.com'
-    SERVICES_MINIO_ACCESS_KEY = 'hello'
-    SERVICES_MINIO_SECRET_KEY = 'helloworld'
-    SERVICES_MINIO_BUCKET = 'drive'
-    SERVICES_MINIO_PROXY = None
+    SERVICES_MINIO_HOST: str = 'minio.local.com'
+    SERVICES_MINIO_ACCESS_KEY: str = 'hello'
+    SERVICES_MINIO_SECRET_KEY: str = 'helloworld'
+    SERVICES_MINIO_BUCKET: str = 'drive'
+    SERVICES_MINIO_PROXY: str = None
     
     class Config:
         case_sensitive: bool = True
