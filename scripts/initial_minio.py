@@ -17,7 +17,7 @@ def main() -> None:
     minio_client.set_bucket_notification(settings.SERVICES_MINIO_BUCKET, NotificationConfig(
         queue_config_list=[
             QueueConfig(
-                'QUEUE-ARN-{}'.format(settings.SERVICES_MINIO_BUCKET.upper()),  # nopep8
+                'arn:minio:sqs::{}:webhook'.format(settings.SERVICES_MINIO_BUCKET.upper()),  # nopep8
                 ["s3:ObjectCreated:*"],
                 config_id=settings.SERVICES_MINIO_BUCKET,
                 prefix_filter_rule=PrefixFilterRule("home"),
