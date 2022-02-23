@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from . import routers
+from . import routers, backgrounds
 
 app = FastAPI()
 app.add_middleware(
@@ -13,3 +13,8 @@ app.add_middleware(
 )
 app.include_router(routers.welcome, tags=["welcome"])
 app.include_router(routers.webhooks, tags=["webhooks"], prefix="/webhooks")
+
+
+@app.on_event("startup")
+async def startup_event():
+    backgrounds.init_minio()

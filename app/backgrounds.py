@@ -3,7 +3,7 @@ from minio.notificationconfig import NotificationConfig, QueueConfig, PrefixFilt
 from app.config import get_settings
 
 
-def main() -> None:
+def init_minio() -> None:
     settings = get_settings()
     minio_client = Minio(settings.SERVICES_MINIO_HOST,
                          access_key=settings.SERVICES_MINIO_ACCESS_KEY,
@@ -24,7 +24,3 @@ def main() -> None:
             ),
         ],
     ))
-
-
-if __name__ == "__main__":
-    main()
