@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     SQLALCHEMY_DATABASE_URI: str = prefix + os.path.join(basedir, 'data.db')
     SQLALCHEMY_ECHO: bool = False
 
-    SERVICES_MINIO_HOST: str = 'minio.local.com'
+    SERVICES_MINIO_HOST: str = '127.0.0.1:9000'
     SERVICES_MINIO_ACCESS_KEY: str = 'hello'
     SERVICES_MINIO_SECRET_KEY: str = 'helloworld'
     SERVICES_MINIO_BUCKET: str = 'drive'
